@@ -23,6 +23,7 @@ public class RuntimeConfigLoaderTests
     [DataRow("dab-config.MsSql.json")]
     [DataRow("dab-config.MySql.json")]
     [DataRow("dab-config.PostgreSql.json")]
+    [DataRow("dab-config.Oracle.json")]
     public async Task CanLoadStandardConfig(string configPath)
     {
         string fileContents = await File.ReadAllTextAsync(configPath);

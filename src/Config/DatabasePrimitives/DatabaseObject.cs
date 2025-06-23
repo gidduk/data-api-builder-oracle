@@ -265,6 +265,8 @@ public class ColumnDefinition
     public bool IsReadOnly { get; set; }
     public object? DefaultValue { get; set; }
 
+    public int? MaxLength { get; set; }
+
     public ColumnDefinition() { }
 
     public ColumnDefinition(Type systemType)

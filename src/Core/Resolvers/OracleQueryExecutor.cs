@@ -14,21 +14,21 @@ using Azure.DataApiBuilder.Core.Models;
 using Azure.DataApiBuilder.Service.Exceptions;
 using Azure.Identity;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Data.SqlClient;
+using Oracle.ManagedDataAccess.Client;
 using Microsoft.Extensions.Logging;
 
 namespace Azure.DataApiBuilder.Core.Resolvers
 {
     /// <summary>
-    /// Specialized QueryExecutor for MsSql mainly providing methods to
+    /// Specialized QueryExecutor for Oracle mainly providing methods to
     /// handle connecting to the database with a managed identity.
     /// /// </summary>
-    public class MsSqlQueryExecutor : QueryExecutor<SqlConnection>
+    public class OracleQueryExecutor : QueryExecutor<OracleConnection>
     {
         // This is the same scope for any Azure SQL database that is
         // required to request a default azure credential access token
         // for a managed identity.
-        public const string DATABASE_SCOPE = @"https://database.windows.net/.default";
+        public const string DATABASE_SCOPE = @"https://ossrdbms-aad.database.windows.net/.default";
 
         /// <summary>
         /// The managed identity Access Token string obtained
@@ -66,7 +66,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
         private const string QUERYIDHEADER = "QueryIdentifyingIds";
 
-        public MsSqlQueryExecutor(
+        public OracleQueryExecutor(
             RuntimeConfigProvider runtimeConfigProvider,
             DbExceptionParser dbExceptionParser,
             ILogger<IQueryExecutor> logger,
@@ -82,30 +82,30 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             _dataSourceToSessionContextUsage = new Dictionary<string, bool>();
             _accessTokensFromConfiguration = runtimeConfigProvider.ManagedIdentityAccessToken;
             _runtimeConfigProvider = runtimeConfigProvider;
-            ConfigureMsSqlQueryExecutor();
+            ConfigureOracleQueryExecutor();
         }
 
         /// <summary>
-        /// Creates a SQLConnection to the data source of given name. This method also adds an event handler to
+        /// Creates a OracleConnection to the data source of given name. This method also adds an event handler to
         /// the connection's InfoMessage to extract the statement ID from the request and add it to httpcontext.
         /// </summary>
         /// <param name="dataSourceName">The name of the data source.</param>
-        /// <returns>The SQLConnection</returns>
+        /// <returns>The OracleConnection</returns>
         /// <exception cref="DataApiBuilderException">Exception thrown if datasource is not found.</exception>
-        public override SqlConnection CreateConnection(string dataSourceName)
+        public override OracleConnection CreateConnection(string dataSourceName)
         {
             if (!ConnectionStringBuilders.ContainsKey(dataSourceName))
             {
                 throw new DataApiBuilderException("Query execution failed. Could not find datasource to execute query against", HttpStatusCode.BadRequest, DataApiBuilderException.SubStatusCodes.DataSourceNotFound);
             }
 
-            SqlConnection conn = new()
+            OracleConnection conn = new()
             {
                 ConnectionString = ConnectionStringBuilders[dataSourceName].ConnectionString,
             };
 
-            // Extract info message from SQLConnection
-            conn.InfoMessage += (object sender, SqlInfoMessageEventArgs e) =>
+            // Extract info message from OracleConnection
+            conn.InfoMessage += (object sender, OracleInfoMessageEventArgs e) =>
             {
                 try
                 {
@@ -114,7 +114,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
                     // If the info message has an error code that matches the well-known codes used for returning statement ID,
                     // then we can be certain that the message contains no PII.
-                    IEnumerable<SqlError> errorsReceived = e.Errors.Cast<SqlError>();
+                    IEnumerable<OracleError> errorsReceived = e.Errors.Cast<OracleError>();
 
                     IEnumerable<SqlInformationalCodes> allInfoCodesKnown = Enum.GetValues(typeof(SqlInformationalCodes)).Cast<SqlInformationalCodes>();
 
@@ -128,7 +128,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
                 }
                 catch (Exception ex)
                 {
-                    QueryExecutorLogger.LogError($"Error in info message handler while extracting query-identifying ID from SQLConnection. Error: {ex.Message}");
+                    QueryExecutorLogger.LogError($"Error in info message handler while extracting query-identifying ID from OracleConnection. Error: {ex.Message}");
                 }
             };
 
@@ -138,23 +138,16 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         /// <summary>
         /// Configure during construction or a hot-reload scenario.
         /// </summary>
-        private void ConfigureMsSqlQueryExecutor()
+        private void ConfigureOracleQueryExecutor()
         {
-            IEnumerable<KeyValuePair<string, DataSource>> mssqldbs = _runtimeConfigProvider.GetConfig().GetDataSourceNamesToDataSourcesIterator().Where(x => x.Value.DatabaseType is DatabaseType.MSSQL || x.Value.DatabaseType is DatabaseType.DWSQL);
+            IEnumerable<KeyValuePair<string, DataSource>> oracledbs = _runtimeConfigProvider.GetConfig().GetDataSourceNamesToDataSourcesIterator().Where(x => x.Value.DatabaseType == DatabaseType.Oracle);
 
-            foreach ((string dataSourceName, DataSource dataSource) in mssqldbs)
+            foreach ((string dataSourceName, DataSource dataSource) in oracledbs)
             {
-                SqlConnectionStringBuilder builder = new(dataSource.ConnectionString);
 
-                if (_runtimeConfigProvider.IsLateConfigured)
-                {
-                    builder.Encrypt = SqlConnectionEncryptOption.Mandatory;
-                    builder.TrustServerCertificate = false;
-                }
+                OracleConnectionStringBuilder builder = new(dataSource.ConnectionString);
 
                 ConnectionStringBuilders.TryAdd(dataSourceName, builder);
-                MsSqlOptions? msSqlOptions = dataSource.GetTypedOptions<MsSqlOptions>();
-                _dataSourceToSessionContextUsage[dataSourceName] = msSqlOptions is null ? false : msSqlOptions.SetSessionContext;
                 _dataSourceAccessTokenUsage[dataSourceName] = ShouldManagedIdentityAccessBeAttempted(builder);
             }
         }
@@ -180,7 +173,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             // Only attempt to get the access token if the connection string is in the appropriate format
             if (setAccessToken)
             {
-                SqlConnection sqlConn = (SqlConnection)conn;
+                OracleConnection sqlConn = (OracleConnection)conn;
 
                 // If the configuration controller provided a managed identity access token use that,
                 // else use the default saved access token if still valid.
@@ -193,7 +186,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
                 if (accessToken is not null)
                 {
-                    sqlConn.AccessToken = accessToken;
+                    sqlConn.AccessToken = null;// accessToken;
                 }
             }
         }
@@ -207,12 +200,10 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         /// a System.InvalidOperationException.
         /// 2. It is NOT a Windows Integrated Security scenario.
         /// </summary>
-        private static bool ShouldManagedIdentityAccessBeAttempted(SqlConnectionStringBuilder builder)
+        private static bool ShouldManagedIdentityAccessBeAttempted(OracleConnectionStringBuilder builder)
         {
-            return string.IsNullOrEmpty(builder.UserID) &&
-                string.IsNullOrEmpty(builder.Password) &&
-                builder.Authentication == SqlAuthenticationMethod.NotSpecified &&
-                !builder.IntegratedSecurity;
+            return !string.IsNullOrEmpty(builder.UserID) &&
+                string.IsNullOrEmpty(builder.Password);
         }
 
         /// <summary>
@@ -266,7 +257,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
                 dataSourceName = ConfigProvider.GetConfig().DefaultDataSourceName;
             }
 
-            if (httpContext is null || !_dataSourceToSessionContextUsage[dataSourceName])
+            if (httpContext is null || _dataSourceToSessionContextUsage.Count == 0 || !_dataSourceToSessionContextUsage[dataSourceName])
             {
                 return string.Empty;
             }
@@ -371,15 +362,21 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         }
 
         /// <inheritdoc />
-        public override SqlCommand PrepareDbCommand(
-            SqlConnection conn,
+        public override OracleCommand PrepareDbCommand(
+            OracleConnection conn,
             string sqltext,
             IDictionary<string, DbConnectionParam> parameters,
             HttpContext? httpContext,
             string dataSourceName)
         {
-            SqlCommand cmd = conn.CreateCommand();
+            OracleCommand cmd = conn.CreateCommand();
             cmd.CommandType = CommandType.Text;
+
+            // Oracle by default binds parameter using position, but we want by name
+            if (OutParametersRequired(sqltext))
+            {
+                cmd.BindByName = true;
+            }
 
             // Add query to send user data from DAB to the underlying database to enable additional security the user might have configured
             // at the database level.
@@ -390,11 +387,17 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             {
                 foreach (KeyValuePair<string, DbConnectionParam> parameterEntry in parameters)
                 {
-                    SqlParameter parameter = cmd.CreateParameter();
+                    OracleParameter parameter = cmd.CreateParameter();
                     parameter.ParameterName = parameterEntry.Key;
                     parameter.Value = parameterEntry.Value.Value ?? DBNull.Value;
                     PopulateDbTypeForParameter(parameterEntry, parameter);
                     cmd.Parameters.Add(parameter);
+                }
+
+                // Add Out parameters only for insert and update.
+                if (OutParametersRequired(sqltext))
+                {
+                    cmd.Parameters.Add("refcursor", OracleDbType.RefCursor).Direction = ParameterDirection.Output;
                 }
             }
 
@@ -402,7 +405,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         }
 
         /// <inheritdoc/>
-        public static void PopulateDbTypeForParameter(KeyValuePair<string, DbConnectionParam> parameterEntry, SqlParameter parameter)
+        public static void PopulateDbTypeForParameter(KeyValuePair<string, DbConnectionParam> parameterEntry, OracleParameter parameter)
         {
             if (parameterEntry.Value is not null)
             {
@@ -413,7 +416,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
                 if (parameterEntry.Value.SqlDbType is not null)
                 {
-                    parameter.SqlDbType = (SqlDbType)parameterEntry.Value.SqlDbType;
+                    parameter.OracleDbType = (OracleDbType)parameterEntry.Value.SqlDbType;
                 }
             }
         }
@@ -444,6 +447,19 @@ namespace Azure.DataApiBuilder.Core.Resolvers
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Determines if the query is an insert/update or not. 
+        /// </summary>
+        private static bool OutParametersRequired(string sqlText)
+        {
+            if (sqlText.Contains($"BEGIN {Environment.NewLine} INSERT", StringComparison.OrdinalIgnoreCase) || sqlText.Contains($"BEGIN {Environment.NewLine} UPDATE", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }

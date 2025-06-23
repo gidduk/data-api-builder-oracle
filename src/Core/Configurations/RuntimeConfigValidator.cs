@@ -470,7 +470,7 @@ public class RuntimeConfigValidator : IConfigValidator
             }
             else
             {
-                // For entities (table/view) that have graphQL exposed, two queries, three mutations for Relational databases (e.g. MYSQL, MSSQL etc.)
+                // For entities (table/view) that have graphQL exposed, two queries, three mutations for Relational databases (e.g. MYSQL, MSSQL, Oracle etc.)
                 // and four mutations for CosmosDb_NoSQL would be generated.
                 // Primary Key Query: For fetching an item using its primary key.
                 // List Query: To fetch a paginated list of items.

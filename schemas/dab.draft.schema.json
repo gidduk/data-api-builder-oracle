@@ -24,7 +24,8 @@
             "postgresql",
             "mysql",
             "cosmosdb_nosql",
-            "cosmosdb_postgresql"
+            "cosmosdb_postgresql",
+            "oracle"
           ]
         },
         "connection-string": {
@@ -126,7 +127,7 @@
           "if": {
             "properties": {
               "database-type": {
-                "enum": ["mysql", "postgresql", "cosmosdb_postgresql"]
+                "enum": ["mysql", "postgresql", "cosmosdb_postgresql", "oracle"]
               }
             }
           },

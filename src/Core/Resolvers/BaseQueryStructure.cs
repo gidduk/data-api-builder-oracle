@@ -7,6 +7,7 @@ using Azure.DataApiBuilder.Config.DatabasePrimitives;
 using Azure.DataApiBuilder.Config.ObjectModel;
 using Azure.DataApiBuilder.Core.Models;
 using Azure.DataApiBuilder.Core.Services;
+using Azure.DataApiBuilder.Core.Services.MetadataProviders;
 using Azure.DataApiBuilder.Service.Exceptions;
 using Azure.DataApiBuilder.Service.GraphQLBuilder.Queries;
 using HotChocolate.Language;
@@ -76,6 +77,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         public virtual Dictionary<EntityActionOperation, string?> DbPolicyPredicatesForOperations { get; set; } = new();
 
         public const string PARAM_NAME_PREFIX = "@";
+        public const string PARAM_NAME_PREFIX_ORACLE = ":";
 
         public BaseQueryStructure(
             ISqlMetadataProvider metadataProvider,
@@ -118,7 +120,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         /// <param name="paramName"> The name of the parameter - backing column name for table/views or parameter name for stored procedures.</param>
         public virtual string MakeDbConnectionParam(object? value, string? paramName = null)
         {
-            string encodedParamName = GetEncodedParamName(Counter.Next());
+            string encodedParamName = MetadataProvider is OracleMetadataProvider ? GetEncodedParamNameForOracle(Counter.Next()) : GetEncodedParamName(Counter.Next());
             if (!string.IsNullOrEmpty(paramName))
             {
                 Parameters.Add(encodedParamName,
@@ -128,7 +130,11 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             }
             else
             {
-                Parameters.Add(encodedParamName, new(value));
+                // Add these parameters only if its not oracle, Oracle requires parameters to be available only when the query requires whem else it will throw ORA-01006: Bind variable does not exist
+                if (MetadataProvider is not OracleMetadataProvider)
+                {
+                    Parameters.Add(encodedParamName, new(value));
+                }
             }
 
             return encodedParamName;
@@ -141,7 +147,17 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         /// <returns>Encoded parameter name.</returns>
         public static string GetEncodedParamName(ulong counterValue)
         {
-            return $"{PARAM_NAME_PREFIX}param{counterValue}";
+            return  $"{PARAM_NAME_PREFIX}param{counterValue}";
+        }
+
+        /// <summary>
+        /// Helper method to create encoded parameter name for Oracle
+        /// </summary>
+        /// <param name="counterValue">The counter value used as a suffix in the encoded parameter name.</param>
+        /// <returns>Encoded parameter name.</returns>
+        public static string GetEncodedParamNameForOracle(ulong counterValue)
+        {
+            return $"{PARAM_NAME_PREFIX_ORACLE}param{counterValue}";
         }
 
         /// <summary>

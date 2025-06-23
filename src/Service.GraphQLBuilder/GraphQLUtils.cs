@@ -39,7 +39,8 @@ namespace Azure.DataApiBuilder.Service.GraphQLBuilder
             DatabaseType.MySQL,
             DatabaseType.DWSQL,
             DatabaseType.PostgreSQL,
-            DatabaseType.CosmosDB_PostgreSQL
+            DatabaseType.CosmosDB_PostgreSQL,
+            DatabaseType.Oracle
         };
 
         public static bool IsModelType(ObjectTypeDefinitionNode objectTypeDefinitionNode)

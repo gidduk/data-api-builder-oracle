@@ -288,6 +288,32 @@ namespace Azure.DataApiBuilder.Core.Services
                 subStatusCode: DataApiBuilderException.SubStatusCodes.UnexpectedError);
         }
 
+        public static Type OracleDbTypeToCLRType(string sqlType)
+        {
+            // Normalize input for case-insensitive comparison
+            string type = sqlType.Trim().ToLowerInvariant();
+
+            return type switch
+            {
+                "char" or "nchar" or "varchar" or "varchar2" or "nvarchar2" or "clob" or "nclob" => typeof(string),
+                "long" => typeof(string), // Oracle 'long' is a character type
+                "number" => typeof(decimal), // Default to decimal, see below for more
+                "float" => typeof(double),
+                "binary_float" => typeof(float),
+                "binary_double" => typeof(double),
+                "date" => typeof(DateTime),
+                "timestamp" or "timestamp with time zone" or "timestamp with local time zone" => typeof(DateTime),
+                "raw" or "long raw" or "blob" or "bfile" => typeof(byte[]),
+                "rowid" or "urowid" => typeof(string),
+                "xmltype" => typeof(string),
+                "boolean" => typeof(bool),
+                // Add more mappings as needed
+
+                // Fallback: treat as string
+                _ => typeof(string)
+            };
+        }
+
         /// <summary>
         /// Helper method to get the DbType corresponding to the given SqlDb datetime type.
         /// </summary>

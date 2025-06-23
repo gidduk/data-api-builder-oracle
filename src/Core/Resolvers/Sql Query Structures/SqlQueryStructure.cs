@@ -102,8 +102,10 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
         public const string CACHE_CONTROL_ONLY_IF_CACHED = "only-if-cached";
 
+        public const string CACHE_CONTROL_MAX_AGE = "max-age=0"; // New
+
         public HashSet<string> cacheControlHeaderOptions = new(
-            new[] { CACHE_CONTROL_NO_STORE, CACHE_CONTROL_NO_CACHE, CACHE_CONTROL_ONLY_IF_CACHED },
+            new[] { CACHE_CONTROL_NO_STORE, CACHE_CONTROL_NO_CACHE, CACHE_CONTROL_ONLY_IF_CACHED, CACHE_CONTROL_MAX_AGE },
             StringComparer.OrdinalIgnoreCase);
 
         /// <summary>

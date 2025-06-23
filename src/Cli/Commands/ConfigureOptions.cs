@@ -74,7 +74,7 @@ namespace Cli.Commands
             RuntimeHostAuthenticationJwtIssuer = runtimeHostAuthenticationJwtIssuer;
         }
 
-        [Option("data-source.database-type", Required = false, HelpText = "Database type. Allowed values: MSSQL, PostgreSQL, CosmosDB_NoSQL, MySQL.")]
+        [Option("data-source.database-type", Required = false, HelpText = "Database type. Allowed values: MSSQL, PostgreSQL, CosmosDB_NoSQL, MySQL, Oracle.")]
         public string? DataSourceDatabaseType { get; }
 
         [Option("data-source.connection-string", Required = false, HelpText = "Connection string for the data source.")]

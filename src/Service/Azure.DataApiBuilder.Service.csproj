@@ -49,6 +49,7 @@
         <Watch Remove="dab-config.MsSql.json" />
         <Watch Remove="dab-config.MySql.json" />
         <Watch Remove="dab-config.PostgreSql.json" />
+        <Watch Remove="dab-config.Oracle.json" />
     </ItemGroup>
 
 
@@ -83,6 +84,7 @@
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+        <PackageReference Include="Oracle.ManagedDataAccess.Core" />
     </ItemGroup>
 
     <ItemGroup>

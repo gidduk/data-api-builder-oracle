@@ -60,6 +60,7 @@ namespace Azure.DataApiBuilder.Service.Tests.Configuration
     {
         private const string COSMOS_ENVIRONMENT = TestCategory.COSMOSDBNOSQL;
         private const string MSSQL_ENVIRONMENT = TestCategory.MSSQL;
+        private const string ORACLE_ENVIRONMENT = TestCategory.ORACLE;
         private const string MYSQL_ENVIRONMENT = TestCategory.MYSQL;
         private const string POSTGRESQL_ENVIRONMENT = TestCategory.POSTGRESQL;
         private const string POST_STARTUP_CONFIG_ENTITY = "Book";
@@ -804,7 +805,14 @@ type Moon {
         [DataRow(DatabaseType.CosmosDB_PostgreSQL, "Something;Application Name=CustAppName;", "Something;Application Name=CustAppName;", false, DisplayName = "[COSMOSDB_PGSQL|DAB OSS]:No modification of customer overridden 'Application Name' property.")]
         [DataRow(DatabaseType.CosmosDB_PostgreSQL, "Something;"                             , "Something;"                             , true , DisplayName = "[COSMOSDB_PGSQL|DAB hosted]:No addition of 'Application Name' property to connection string.")]
         [DataRow(DatabaseType.CosmosDB_PostgreSQL, "Something;Application Name=CustAppName;", "Something;Application Name=CustAppName;", true , DisplayName = "[COSMOSDB_PGSQL|DAB hosted]:No modification of customer overridden 'Application Name' property.")]
-        #pragma warning restore format
+        [DataRow(DatabaseType.Oracle, "Something;", "Something;", false, DisplayName = "[ORACLE|DAB OSS]:No addition of 'Application Name' or 'App' property to connection string.")]
+        [DataRow(DatabaseType.Oracle, "Something;Application Name=CustAppName;", "Something;Application Name=CustAppName;", false, DisplayName = "[ORACLE|DAB OSS]:No modification of customer overridden 'Application Name' property.")]
+        [DataRow(DatabaseType.Oracle, "Something1;App=CustAppName;Something2;", "Something1;App=CustAppName;Something2;", false, DisplayName = "[ORACLE|DAB OSS]:No modification of customer overridden 'App' property.")]
+        [DataRow(DatabaseType.Oracle, "Something;", "Something;", true, DisplayName = "[ORACLE|DAB hosted]:No addition of 'Application Name' or 'App' property to connection string.")]
+        [DataRow(DatabaseType.Oracle, "Something;Application Name=CustAppName;", "Something;Application Name=CustAppName;", true, DisplayName = "[ORACLE|DAB hosted]:No modification of customer overridden 'Application Name' property.")]
+        [DataRow(DatabaseType.Oracle, "Something1;App=CustAppName;Something2;", "Something1;App=CustAppName;Something2;", true, DisplayName = "[ORACLE|DAB hosted]:No modification of customer overridden 'App' property.")]
+
+#pragma warning restore format
         public void TestConnectionStringIsCorrectlyUpdatedWithApplicationName(
             DatabaseType databaseType,
             string configProvidedConnString,
@@ -1232,6 +1240,16 @@ type Moon {
         }
 
         /// <summary>
+        /// This test reads the dab-config.Oracle.json file and validates that the
+        /// deserialization succeeds.
+        /// </summary>
+        [TestMethod("Validates if deserialization of Oracle config file succeeds."), TestCategory(TestCategory.ORACLE)]
+        public Task TestReadingRuntimeConfigForOracle()
+        {
+            return ConfigFileDeserializationValidationHelper(File.ReadAllText($"{CONFIGFILE_NAME}.{MSSQL_ENVIRONMENT}{CONFIG_EXTENSION}"));
+        }
+
+        /// <summary>
         /// This test reads the dab-config.MySql.json file and validates that the
         /// deserialization succeeds.
         /// </summary>
@@ -1633,6 +1651,225 @@ type Moon {
         public async Task TestConfigSchemaIsValid()
         {
             TestHelper.SetupDatabaseEnvironment(MSSQL_ENVIRONMENT);
+            FileSystemRuntimeConfigLoader configLoader = TestHelper.GetRuntimeConfigLoader();
+
+            Mock<ILogger<JsonConfigSchemaValidator>> schemaValidatorLogger = new();
+
+            string jsonSchema = File.ReadAllText("dab.draft.schema.json");
+            string jsonData = File.ReadAllText(configLoader.ConfigFilePath);
+
+            JsonConfigSchemaValidator jsonSchemaValidator = new(schemaValidatorLogger.Object, new MockFileSystem());
+
+            JsonSchemaValidationResult result = await jsonSchemaValidator.ValidateJsonConfigWithSchemaAsync(jsonSchema, jsonData);
+            Assert.IsTrue(result.IsValid);
+            Assert.IsTrue(EnumerableUtilities.IsNullOrEmpty(result.ValidationErrors));
+            schemaValidatorLogger.Verify(
+                x => x.Log(
+                    LogLevel.Information,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains($"The config satisfies the schema requirements.")),
+                    It.IsAny<Exception>(),
+                    (Func<It.IsAnyType, Exception, string>)It.IsAny<object>()),
+                Times.Once);
+        }
+
+        /// <summary>
+        /// This test method checks a valid config's entities against
+        /// the database and ensures they are valid.
+        /// </summary>
+        [TestMethod("Validation passes for valid entities against database."), TestCategory(TestCategory.ORACLE)]
+        public async Task TestOracleMetadataForValidConfigEntities()
+        {
+            TestHelper.SetupDatabaseEnvironment(ORACLE_ENVIRONMENT);
+            FileSystemRuntimeConfigLoader configPath = TestHelper.GetRuntimeConfigLoader();
+            RuntimeConfigProvider configProvider = TestHelper.GetRuntimeConfigProvider(configPath);
+
+            Mock<ILogger<RuntimeConfigValidator>> configValidatorLogger = new();
+            ILoggerFactory mockLoggerFactory = TestHelper.ProvisionLoggerFactory();
+
+            RuntimeConfigValidator configValidator =
+                new(
+                    configProvider,
+                    new MockFileSystem(),
+                    configValidatorLogger.Object,
+                    isValidateOnly: true);
+
+            configValidator.ValidateRelationshipConfigCorrectness(configProvider.GetConfig());
+            await configValidator.ValidateEntitiesMetadata(configProvider.GetConfig(), mockLoggerFactory);
+            Assert.IsTrue(EnumerableUtilities.IsNullOrEmpty(configValidator.ConfigValidationExceptions));
+        }
+
+        /// <summary>
+        /// This test method checks a valid config's entities against
+        /// the database and ensures they are valid.
+        /// The config contains an entity source object not present in the database.
+        /// It also contains an entity whose source is incorrectly specified as a stored procedure.
+        /// </summary>
+        [TestMethod("Validation fails for invalid entities against database."), TestCategory(TestCategory.ORACLE)]
+        public async Task TestOracleMetadataForInvalidConfigEntities()
+        {
+            TestHelper.SetupDatabaseEnvironment(ORACLE_ENVIRONMENT);
+
+            DataSource dataSource = new(DatabaseType.Oracle,
+                GetConnectionStringFromEnvironmentConfig(environment: TestCategory.ORACLE),
+                Options: null);
+
+            RuntimeConfig configuration = InitMinimalRuntimeConfig(dataSource, new(), new());
+
+            // creating an entity with invalid table name
+            Entity entityWithInvalidSourceName = new(
+                Source: new("bokos", EntitySourceType.Table, null, null),
+                Rest: null,
+                GraphQL: new(Singular: "book", Plural: "books"),
+                Permissions: new[] { GetMinimalPermissionConfig(AuthorizationResolver.ROLE_ANONYMOUS) },
+                Relationships: null,
+                Mappings: null
+                );
+
+            Entity entityWithInvalidSourceType = new(
+                Source: new("publishers", EntitySourceType.StoredProcedure, null, null),
+                Rest: null,
+                GraphQL: new(Singular: "publisher", Plural: "publishers"),
+                Permissions: new[] { GetMinimalPermissionConfig(AuthorizationResolver.ROLE_AUTHENTICATED) },
+                Relationships: null,
+                Mappings: null
+                );
+
+            configuration = configuration with
+            {
+                Entities = new RuntimeEntities(new Dictionary<string, Entity>()
+                    {
+                        { "Book", entityWithInvalidSourceName },
+                        { "Publisher", entityWithInvalidSourceType}
+                    })
+            };
+
+            const string CUSTOM_CONFIG = "custom-config.json";
+            File.WriteAllText(CUSTOM_CONFIG, configuration.ToJson());
+
+            FileSystemRuntimeConfigLoader configLoader = TestHelper.GetRuntimeConfigLoader();
+            configLoader.UpdateConfigFilePath(CUSTOM_CONFIG);
+            RuntimeConfigProvider configProvider = TestHelper.GetRuntimeConfigProvider(configLoader);
+
+            Mock<ILogger<RuntimeConfigValidator>> configValidatorLogger = new();
+            RuntimeConfigValidator configValidator =
+                new(
+                    configProvider,
+                    new MockFileSystem(),
+                    configValidatorLogger.Object,
+                    isValidateOnly: true);
+
+            ILoggerFactory mockLoggerFactory = TestHelper.ProvisionLoggerFactory();
+
+            configValidator.ValidateRelationshipConfigCorrectness(configProvider.GetConfig());
+            await configValidator.ValidateEntitiesMetadata(configProvider.GetConfig(), mockLoggerFactory);
+
+            Assert.IsTrue(configValidator.ConfigValidationExceptions.Any());
+            Assert.AreEqual(2, configValidator.ConfigValidationExceptions.Count);
+            List<Exception> exceptionsList = configValidator.ConfigValidationExceptions;
+            Assert.AreEqual("Cannot obtain Schema for entity Book with underlying database "
+                + "object source: dbo.bokos due to: Invalid object name 'dbo.bokos'.", exceptionsList[0].Message);
+            Assert.AreEqual("No stored procedure definition found for the given database object publishers", exceptionsList[1].Message);
+        }
+
+        /// <summary>
+        /// This Test validates that when the entities in the runtime config have source object as null,
+        /// the validation exception handler collects the message and exits gracefully.
+        /// </summary>
+        [TestMethod("Validate Exception handling for Entities with Source object as null."), TestCategory(TestCategory.ORACLE)]
+        public async Task TestOracleMetadataValidationForEntitiesWithInvalidSource()
+        {
+            TestHelper.SetupDatabaseEnvironment(ORACLE_ENVIRONMENT);
+
+            DataSource dataSource = new(DatabaseType.MSSQL,
+                GetConnectionStringFromEnvironmentConfig(environment: TestCategory.ORACLE),
+                Options: null);
+
+            RuntimeConfig configuration = InitMinimalRuntimeConfig(dataSource, new(), new());
+
+            // creating an entity with invalid table name
+            Entity entityWithInvalidSource = new(
+                Source: new(null, EntitySourceType.Table, null, null),
+                Rest: null,
+                GraphQL: new(Singular: "book", Plural: "books"),
+                Permissions: new[] { GetMinimalPermissionConfig(AuthorizationResolver.ROLE_ANONYMOUS) },
+                Relationships: null,
+                Mappings: null
+                );
+
+            // creating an entity with invalid source object and adding relationship with an entity with invalid source
+            Entity entityWithInvalidSourceAndRelationship = new(
+                Source: new(null, EntitySourceType.Table, null, null),
+                Rest: null,
+                GraphQL: new(Singular: "publisher", Plural: "publishers"),
+                Permissions: new[] { GetMinimalPermissionConfig(AuthorizationResolver.ROLE_ANONYMOUS) },
+                Relationships: new Dictionary<string, EntityRelationship>() { {"books", new (
+                    Cardinality: Cardinality.Many,
+                    TargetEntity: "Book",
+                    SourceFields: null,
+                    TargetFields: null,
+                    LinkingObject: null,
+                    LinkingSourceFields: null,
+                    LinkingTargetFields: null
+                    )}},
+                Mappings: null
+                );
+
+            configuration = configuration with
+            {
+                Entities = new RuntimeEntities(new Dictionary<string, Entity>()
+                    {
+                        { "Book", entityWithInvalidSource },
+                        { "Publisher", entityWithInvalidSourceAndRelationship}
+                    })
+            };
+
+            const string CUSTOM_CONFIG = "custom-config.json";
+            File.WriteAllText(CUSTOM_CONFIG, configuration.ToJson());
+
+            FileSystemRuntimeConfigLoader configLoader = TestHelper.GetRuntimeConfigLoader();
+            configLoader.UpdateConfigFilePath(CUSTOM_CONFIG);
+            RuntimeConfigProvider configProvider = TestHelper.GetRuntimeConfigProvider(configLoader);
+
+            Mock<ILogger<RuntimeConfigValidator>> configValidatorLogger = new();
+            RuntimeConfigValidator configValidator =
+                new(
+                    configProvider,
+                    new MockFileSystem(),
+                    configValidatorLogger.Object,
+                    isValidateOnly: true);
+
+            ILoggerFactory mockLoggerFactory = TestHelper.ProvisionLoggerFactory();
+
+            try
+            {
+                configValidator.ValidateRelationshipConfigCorrectness(configProvider.GetConfig());
+                await configValidator.ValidateEntitiesMetadata(configProvider.GetConfig(), mockLoggerFactory);
+            }
+            catch
+            {
+                Assert.Fail("Execution of dab validate should not result in unhandled exceptions.");
+            }
+
+            Assert.IsTrue(configValidator.ConfigValidationExceptions.Any());
+            List<string> exceptionMessagesList = configValidator.ConfigValidationExceptions.Select(x => x.Message).ToList();
+            Assert.IsTrue(exceptionMessagesList.Contains("The entity Book does not have a valid source object."));
+            Assert.IsTrue(exceptionMessagesList.Contains("The entity Publisher does not have a valid source object."));
+            Assert.IsTrue(exceptionMessagesList.Contains("Table Definition for Book has not been inferred."));
+            Assert.IsTrue(exceptionMessagesList.Contains("Table Definition for Publisher has not been inferred."));
+            Assert.IsTrue(exceptionMessagesList.Contains("Could not infer database object for source entity: Publisher in relationship: books. Check if the entity: Publisher is correctly defined in the config."));
+            Assert.IsTrue(exceptionMessagesList.Contains("Could not infer database object for target entity: Book in relationship: books. Check if the entity: Book is correctly defined in the config."));
+        }
+
+        /// <summary>
+        /// This test method validates a sample DAB runtime config file against DAB's JSON schema definition.
+        /// It asserts that the validation is successful and there are no validation failures.
+        /// It also verifies that the expected log message is logged.
+        /// </summary>
+        [TestMethod("Validates the config file schema."), TestCategory(TestCategory.ORACLE)]
+        public async Task TestOracleConfigSchemaIsValid()
+        {
+            TestHelper.SetupDatabaseEnvironment(ORACLE_ENVIRONMENT);
             FileSystemRuntimeConfigLoader configLoader = TestHelper.GetRuntimeConfigLoader();
 
             Mock<ILogger<JsonConfigSchemaValidator>> schemaValidatorLogger = new();

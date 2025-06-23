@@ -1157,25 +1157,6 @@ namespace Azure.DataApiBuilder.Core.Services
         }
 
         /// <summary>
-        /// Helper method to create params for the query.
-        /// </summary>
-        /// <param name="paramName">Common prefix of param names.</param>
-        /// <param name="paramValues">Values of the param.</param>
-        /// <returns></returns>
-        private static Dictionary<string, object> GetQueryParams(
-            string paramName,
-            object[] paramValues)
-        {
-            Dictionary<string, object> parameters = new();
-            for (int paramNumber = 0; paramNumber < paramValues.Length; paramNumber++)
-            {
-                parameters.Add($"{paramName}{paramNumber}", paramValues[paramNumber]);
-            }
-
-            return parameters;
-        }
-
-        /// <summary>
         /// Generate the mappings of exposed names to
         /// backing columns, and of backing columns to
         /// exposed names. Used to generate EDM Model using
@@ -1353,7 +1334,7 @@ namespace Azure.DataApiBuilder.Core.Services
         /// <param name="tableName">Name of the table.</param>
         /// <param name="schemaOrDatabaseName">Name of the schema (for MsSql/PgSql)/database (for MySql) of the table.</param>
         /// <param name="sourceDefinition">Table definition.</param>
-        private async Task PopulateColumnDefinitionsWithReadOnlyFlag(string tableName, string schemaOrDatabaseName, SourceDefinition sourceDefinition)
+        public virtual async Task PopulateColumnDefinitionsWithReadOnlyFlag(string tableName, string schemaOrDatabaseName, SourceDefinition sourceDefinition)
         {
             string schemaOrDatabaseParamName = $"{BaseQueryStructure.PARAM_NAME_PREFIX}param0";
             string quotedTableName = SqlQueryBuilder.QuoteTableNameAsDBConnectionParam(tableName);
@@ -1508,7 +1489,7 @@ namespace Azure.DataApiBuilder.Core.Services
         /// Using a data adapter, obtains the schema of the given table name
         /// and adds the corresponding entity in the data set.
         /// </summary>
-        private async Task<DataTable> FillSchemaForTableAsync(
+        public virtual async Task<DataTable> FillSchemaForTableAsync(
             string schemaName,
             string tableName)
         {
@@ -1832,7 +1813,7 @@ namespace Azure.DataApiBuilder.Core.Services
         /// <param name="args">Arguments to this function. This parameter is unused in this method.
         /// This is added so that the method conforms with the Func delegate's signature.</param>
         /// <returns>List of read-only fields present in the table.</returns>
-        private async Task<List<string>>
+        protected async Task<List<string>>
             SummarizeReadOnlyFieldsMetadata(DbDataReader reader, List<string>? args = null)
         {
             // Extract all the rows in the current Result Set of DbDataReader.

@@ -10,5 +10,6 @@ namespace Azure.DataApiBuilder.Service.Tests
         public const string POSTGRESQL = "PostgreSql";
         public const string MYSQL = "MySql";
         public const string DWSQL = "DwSql";
+        public const string ORACLE = "Oracle";
     }
 }

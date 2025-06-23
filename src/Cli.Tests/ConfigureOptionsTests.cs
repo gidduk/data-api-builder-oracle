@@ -641,6 +641,7 @@ namespace Cli.Tests
         [DataRow("cosmosdb_nosql", DisplayName = "Update the database type to CosmosDB_NoSQL")]
         [DataRow("cosmosdb_postgresql", DisplayName = "Update the database type to CosmosDB_PGSQL")]
         [DataRow("mysql", DisplayName = "Update the database type to MySQL")]
+        [DataRow("oracle", DisplayName = "Update the database type to Oracle")]
         public void TestDatabaseTypeUpdate(string dbType)
         {
             // Arrange

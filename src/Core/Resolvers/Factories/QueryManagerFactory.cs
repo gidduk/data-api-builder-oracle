@@ -90,6 +90,11 @@ namespace Azure.DataApiBuilder.Core.Resolvers.Factories
                         exceptionParser = new MsSqlDbExceptionParser(_runtimeConfigProvider);
                         queryExecutor = new MsSqlQueryExecutor(_runtimeConfigProvider, exceptionParser, _logger, _contextAccessor, _handler);
                         break;
+                    case DatabaseType.Oracle:
+                        queryBuilder = new OracleQueryBuilder();
+                        exceptionParser = new OracleExceptionParser(_runtimeConfigProvider);
+                        queryExecutor = new OracleQueryExecutor(_runtimeConfigProvider, exceptionParser, _logger, _contextAccessor, _handler);
+                        break;
                     default:
                         throw new NotSupportedException(dataSource.DatabaseTypeNotSupportedMessage);
                 }
