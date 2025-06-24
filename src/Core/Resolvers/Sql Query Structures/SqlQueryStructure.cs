@@ -589,15 +589,6 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             {
                 CacheControlOption = cacheControlOption;
             }
-
-            if (!string.IsNullOrEmpty(CacheControlOption) &&
-                !cacheControlHeaderOptions.Contains(CacheControlOption))
-            {
-                throw new DataApiBuilderException(
-                    message: "Request Header Cache-Control is invalid: " + CacheControlOption,
-                    statusCode: HttpStatusCode.BadRequest,
-                    subStatusCode: DataApiBuilderException.SubStatusCodes.BadRequest);
-            }
         }
 
         /// <summary>
