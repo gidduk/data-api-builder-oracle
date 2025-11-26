@@ -88,8 +88,47 @@ switch (aspireDB)
         }
 
         break;
+    case "oracle":
+        var oracleScript = File.ReadAllText("./init-scripts/oracle/create-database-oracle.sql");
+
+        IResourceBuilder<OracleDatabaseResource>? oracleDB = null;
+
+        if (!string.IsNullOrEmpty(databaseConnectionString))
+        {
+            Console.WriteLine("No connection string provided, starting a local Oracle container.");
+
+            oracleDB = builder.AddOracle("oracle")
+                .WithLifetime(ContainerLifetime.Persistent)
+                .AddDatabase("oracle", "oracle");
+            //.WithCreationScript(oracleScript);
+        }
+
+        var oracleService = builder.AddProject<Projects.Azure_DataApiBuilder_Service>("oracle-service", "Development")
+            .WithArgs("-f", "net8.0")
+            .WithEndpoint(endpointName: "https", (e) => e.Port = 1234)
+            .WithEndpoint(endpointName: "http", (e) => e.Port = 2345)
+            .WithEnvironment("db-type", "oracle")
+            .WithUrls((e) =>
+            {
+                e.Urls.Clear();
+                e.Urls.Add(new() { Url = "/swagger", DisplayText = "🔒Swagger", Endpoint = e.GetEndpoint("https") });
+                e.Urls.Add(new() { Url = "/graphql", DisplayText = "🔒GraphQL", Endpoint = e.GetEndpoint("https") });
+            })
+            .WithHttpHealthCheck("/health");
+
+        if (oracleDB is null)
+        {
+            oracleService.WithEnvironment("ConnectionStrings__Database", databaseConnectionString);
+        }
+        else
+        {
+            oracleService.WithEnvironment("ConnectionStrings__Database", oracleDB)
+                .WaitFor(oracleDB);
+        }
+
+        break;
     default:
-        throw new Exception("Please set the ASPIRE_DATABASE environment variable to either 'mssql' or 'postgresql'.");
+        throw new Exception("Please set the ASPIRE_DATABASE environment variable to either 'mssql' or 'postgresql' or 'oracle'.");
 }
 
 builder.Build().Run();

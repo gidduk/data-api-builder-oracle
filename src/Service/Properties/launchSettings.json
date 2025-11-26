@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "Azure.DataApiBuilder.Service": {
       "commandName": "Project",
@@ -59,6 +58,17 @@
         "ASPNETCORE_ENVIRONMENT": "CosmosDb_NoSql"
       },
       "applicationUrl": "https://localhost:5001;http://localhost:5000"
+    },
+    "Oracle": {
+      "commandName": "Project",
+      "commandLineArgs": "--ConfigFileName ../../dab.config-oracle.json",
+      "launchBrowser": true,
+      "launchUrl": "graphql",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Oracle"
+      },
+      "applicationUrl": "https://localhost:5001;http://localhost:5000"
     }
-  }
+  },
+  "$schema": "http://json.schemastore.org/launchsettings.json"
 }

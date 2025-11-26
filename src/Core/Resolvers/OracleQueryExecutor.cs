@@ -14,8 +14,6 @@ using Azure.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Oracle.ManagedDataAccess.Client;
-using Polly;
-using Polly.Retry;
 
 namespace Azure.DataApiBuilder.Core.Resolvers
 {
@@ -57,14 +55,6 @@ namespace Azure.DataApiBuilder.Core.Resolvers
 
         private readonly RuntimeConfigProvider _runtimeConfigProvider;
 
-        // The maximum number of attempts that can be made to execute the query successfully in addition to the first attempt.
-        // So to say in case of transient exceptions, the query will be executed (_maxRetryCount + 1) times at max.
-        private static int _maxRetryCount = 2;
-
-        private AsyncRetryPolicy _retryPolicyAsync;
-
-        private RetryPolicy _retryPolicy;
-
         public OracleQueryExecutor(
             RuntimeConfigProvider runtimeConfigProvider,
             DbExceptionParser dbExceptionParser,
@@ -81,26 +71,6 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             _accessTokensFromConfiguration = runtimeConfigProvider.ManagedIdentityAccessToken;
             _runtimeConfigProvider = runtimeConfigProvider;
             ConfigureOracleQueryExecutor();
-
-            _retryPolicyAsync = Policy
-               .Handle<DbException>(DbExceptionParser.IsTransientException)
-               .WaitAndRetryAsync(
-                   retryCount: _maxRetryCount,
-                   sleepDurationProvider: (attempt) => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
-                   onRetry: (exception, backOffTime) =>
-                   {
-                       QueryExecutorLogger.LogError(exception: exception, message: "Error during query execution, retrying.");
-                   });
-
-            _retryPolicy = Policy
-                .Handle<DbException>(DbExceptionParser.IsTransientException)
-                .WaitAndRetry(
-                    retryCount: _maxRetryCount,
-                    sleepDurationProvider: (attempt) => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
-                    onRetry: (exception, backOffTime) =>
-                    {
-                        QueryExecutorLogger.LogError(exception: exception, message: "Error during query execution, retrying.");
-                    });
         }
 
         /// <summary>
@@ -421,29 +391,29 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             return resultSet;
         }
 
-        /// <summary>
-        /// Extracts LabelledColumn information from output parameters in the command.
-        /// </summary>
-        private static List<LabelledColumn> ExtractOutputColumnsFromParameters(OracleParameterCollection parameters)
-        {
-            List<LabelledColumn> outputColumns = new();
+        ///// <summary>
+        ///// Extracts LabelledColumn information from output parameters in the command.
+        ///// </summary>
+        //private static List<LabelledColumn> ExtractOutputColumnsFromParameters(OracleParameterCollection parameters)
+        //{
+        //    List<LabelledColumn> outputColumns = new();
 
-            foreach (OracleParameter param in parameters)
-            {
-                if (param.Direction == ParameterDirection.Output && param.ParameterName.StartsWith("out_", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Remove the "out_" prefix to get the column name
-                    string columnName = param.ParameterName.Substring(4);
+        //    foreach (OracleParameter param in parameters)
+        //    {
+        //        if (param.Direction == ParameterDirection.Output && param.ParameterName.StartsWith("out_", StringComparison.OrdinalIgnoreCase))
+        //        {
+        //            // Remove the "out_" prefix to get the column name
+        //            string columnName = param.ParameterName.Substring(4);
 
-                    // For Oracle, the label and column name are typically the same
-                    // unless there's a mapping defined elsewhere
-                    // Updated to match the required LabelledColumn constructor signature
-                    outputColumns.Add(new LabelledColumn(columnName, columnName, columnName, columnName, null));
-                }
-            }
+        //            // For Oracle, the label and column name are typically the same
+        //            // unless there's a mapping defined elsewhere
+        //            // Updated to match the required LabelledColumn constructor signature
+        //            outputColumns.Add(new LabelledColumn(columnName, columnName, columnName, columnName, null));
+        //        }
+        //    }
 
-            return outputColumns;
-        }
+        //    return outputColumns;
+        //}
 
         /// <summary>
         /// Determines appropriate size for output parameters based on OracleDbType.
