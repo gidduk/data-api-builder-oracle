@@ -678,6 +678,15 @@ public class ConfigurationHotReloadTests
           TimeSpan.FromSeconds(12),
           TimeSpan.FromMilliseconds(500));
 
+        // Hot Reload should succeed here
+        GenerateConfigFile(
+            databaseType: DatabaseType.Oracle,
+            connectionString: $"{ConfigurationTests.GetConnectionStringFromEnvironmentConfig(TestCategory.ORACLE).Replace("\\", "\\\\")}");
+        await ConfigurationHotReloadTests.WaitForConditionAsync(
+          () => _writer.ToString().Contains(succeedKeyWord),
+          TimeSpan.FromSeconds(12),
+          TimeSpan.FromMilliseconds(500));
+
         // Log that shows that hot-reload validated properly
         string succeedConfigLog = $"{_writer.ToString()}";
 

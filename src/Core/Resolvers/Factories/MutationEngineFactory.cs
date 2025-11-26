@@ -83,6 +83,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers.Factories
                 _mutationEngines.Add(DatabaseType.MSSQL, mutationEngine);
                 _mutationEngines.Add(DatabaseType.PostgreSQL, mutationEngine);
                 _mutationEngines.Add(DatabaseType.DWSQL, mutationEngine);
+                _mutationEngines.Add(DatabaseType.Oracle, mutationEngine);
             }
 
             if (config.CosmosDataSourceUsed)

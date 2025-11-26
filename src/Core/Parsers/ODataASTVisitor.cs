@@ -274,10 +274,22 @@ namespace Azure.DataApiBuilder.Core.Parsers
         {
             SingleValuePropertyAccessNode propertyNode = nodeIn.Left.GetType() == typeof(SingleValuePropertyAccessNode) ?
                     (SingleValuePropertyAccessNode)nodeIn.Left : (SingleValuePropertyAccessNode)nodeIn.Right;
-            string? paramName = BaseQueryStructure.GetEncodedParamName(_struct.Counter.Current() - 1);
+            string? baseParamName = BaseQueryStructure.GetEncodedParamName(_struct.Counter.Current() - 1);
+            // Construct the full parameter name with prefix
+            string fullParamName = $"{_struct.ParamNamePrefix}{baseParamName}";
+
             _metadataProvider.TryGetBackingColumn(_struct.EntityName, propertyNode.Property.Name, out string? backingColumnName);
-            _struct.Parameters[paramName].DbType = _struct.GetUnderlyingSourceDefinition().Columns[backingColumnName!].DbType;
-            _struct.Parameters[paramName].SqlDbType = _struct.GetUnderlyingSourceDefinition().Columns[backingColumnName!].SqlDbType;
+            _struct.Parameters[fullParamName].DbType = _struct.GetUnderlyingSourceDefinition().Columns[backingColumnName!].DbType;
+
+            // Only populate SqlDbType or OracleDbType based on database type
+            if (_metadataProvider.GetDatabaseType() == DatabaseType.Oracle)
+            {
+                _struct.Parameters[fullParamName].OracleDbType = _struct.GetUnderlyingSourceDefinition().Columns[backingColumnName!].OracleDbType;
+            }
+            else
+            {
+                _struct.Parameters[fullParamName].SqlDbType = _struct.GetUnderlyingSourceDefinition().Columns[backingColumnName!].SqlDbType;
+            }
         }
 
         /// <summary>

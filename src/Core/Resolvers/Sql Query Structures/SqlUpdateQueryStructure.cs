@@ -151,6 +151,12 @@ namespace Azure.DataApiBuilder.Core.Resolvers
                     statusCode: HttpStatusCode.BadRequest,
                     subStatusCode: DataApiBuilderException.SubStatusCodes.BadRequest);
             }
+
+            // Add output parameters for Oracle MERGE RETURNING clause
+            if (MetadataProvider.GetDatabaseType() == DatabaseType.Oracle)
+            {
+                OracleReturningParameterHelper.AddOracleOutputParameters(OutputColumns, sourceDefinition, Parameters);
+            }
         }
 
         private Predicate CreatePredicateForParam(KeyValuePair<string, object?> param)

@@ -22,9 +22,9 @@ Data API builder (DAB) is an open-source, no-code tool that creates secure, full
 
 ### Which databases does Data API builder support?
 
-|               | Azure SQL | SQL Server | SQLDW | Cosmos DB | PostgreSQL | MySQL |
-| :-----------: | :-------: | :--------: | :---: | :-------: | :--------: | :---: |
-| **Supported** |    Yes    |     Yes    |  Yes  |    Yes    |     Yes    |  Yes  |
+|               | Azure SQL | SQL Server | SQLDW | Cosmos DB | PostgreSQL | MySQL | Oracle |
+| :-----------: | :-------: | :--------: | :---: | :-------: | :--------: | :---: | :----:
+| **Supported** |    Yes    |     Yes    |  Yes  |    Yes    |     Yes    |  Yes  |   Yes
 
 ### Which environments does Data API builder support?
 
@@ -130,7 +130,7 @@ Data API builder (DAB) requires a JSON configuration file. Use `dab --help` for 
 
 ```sh
 dab init
-  --database-type mssql
+  --database-type oracle
   --connection-string "@env('my-connection-string')"
   --host-mode development
 ```
@@ -146,7 +146,7 @@ The file `dab-config.json` is automatically created through this process. These 
 {
   "$schema": "https://github.com/Azure/data-api-builder/releases/download/v1.5.56/dab.draft.schema.json",
   "data-source": {
-    "database-type": "mssql",
+    "database-type": "oracle",
     "connection-string": "@env('my-connection-string')",
     "options": {
       "set-session-context": false
@@ -178,10 +178,10 @@ The file `dab-config.json` is automatically created through this process. These 
 }
 ```
 ### 6. Add your table to the configuration
-
+Replace <SCHEMA>with the user you are connecting to. Have Oracle entities in UPPERCASE
 ```sh
-dab add Todo
-  --source "dbo.Todo"
+dab add BOOKS
+  --source "<SCHEMA>.BOOKS"
   --permissions "anonymous:*"
 ```
 
@@ -195,16 +195,16 @@ The `entities` section of the configuration is no longer empty:
 ```json
 {
   "entities": {
-    "Todo": {
+    "book": {
       "source": {
-        "object": "dbo.Todo",
+        "object": "<SCHEMA>.BOOKS",
         "type": "table"
       },
       "graphql": {
         "enabled": true,
         "type": {
-          "singular": "Todo",
-          "plural": "Todos"
+          "singular": "Book",
+          "plural": "Books"
         }
       },
       "rest": {
@@ -241,7 +241,7 @@ dab start
 By default, DAB enables both REST and GraphQL.
 
 ```sh
-GET http://localhost:5000/api/Todo
+GET http://localhost:5000/api/Book
 ```
 
 > [!NOTE]

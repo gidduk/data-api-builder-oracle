@@ -27,6 +27,7 @@
       <PackageReference Include="Humanizer" />
       <PackageReference Include="Npgsql" />
       <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+      <PackageReference Include="Oracle.ManagedDataAccess.Core" />
   </ItemGroup>
 
     <ItemGroup>

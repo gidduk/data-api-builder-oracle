@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.Data;
+using Oracle.ManagedDataAccess.Client;
 
 namespace Azure.DataApiBuilder.Core.Models;
 
@@ -10,11 +11,12 @@ namespace Azure.DataApiBuilder.Core.Models;
 /// </summary>
 public class DbConnectionParam
 {
-    public DbConnectionParam(object? value, DbType? dbType = null, SqlDbType? sqlDbType = null)
+    public DbConnectionParam(object? value, DbType? dbType = null, SqlDbType? sqlDbType = null, OracleDbType? oracleDbType = null)
     {
         Value = value;
         DbType = dbType;
         SqlDbType = sqlDbType;
+        OracleDbType = oracleDbType;
     }
 
     /// <summary>
@@ -31,4 +33,8 @@ public class DbConnectionParam
     // This is being made nullable
     // because it's not populated for DB's other than MSSQL.
     public SqlDbType? SqlDbType { get; set; }
+
+    // This is being made nullable
+    // because it's not populated for DB's other than Oracle.
+    public OracleDbType? OracleDbType { get; set; }
 }

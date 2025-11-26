@@ -63,6 +63,7 @@ namespace Azure.DataApiBuilder.Service.Tests.Configuration
         private const string MSSQL_ENVIRONMENT = TestCategory.MSSQL;
         private const string MYSQL_ENVIRONMENT = TestCategory.MYSQL;
         private const string POSTGRESQL_ENVIRONMENT = TestCategory.POSTGRESQL;
+        private const string ORACLE_ENVIRONMENT = TestCategory.ORACLE;
         private const string POST_STARTUP_CONFIG_ENTITY = "Book";
         private const string POST_STARTUP_CONFIG_ENTITY_SOURCE = "books";
         private const string POST_STARTUP_CONFIG_ROLE = "PostStartupConfigRole";
@@ -1285,6 +1286,26 @@ type Moon {
 
             MetadataProviderFactory metadataProviderFactory = (MetadataProviderFactory)server.Services.GetService(typeof(IMetadataProviderFactory));
             Assert.IsTrue(metadataProviderFactory.ListMetadataProviders().Any(x => x.GetType() == typeof(MySqlMetadataProvider)));
+        }
+
+        [TestMethod("Validates that local Oracle settings can be loaded and the correct classes are in the service provider."), TestCategory(TestCategory.ORACLE)]
+        public void TestLoadingLocalOracleSettings()
+        {
+            Environment.SetEnvironmentVariable(ASP_NET_CORE_ENVIRONMENT_VAR_NAME, ORACLE_ENVIRONMENT);
+            TestServer server = new(Program.CreateWebHostBuilder(Array.Empty<string>()));
+
+            QueryEngineFactory queryEngineFactory = (QueryEngineFactory)server.Services.GetService(typeof(IQueryEngineFactory));
+            Assert.IsInstanceOfType(queryEngineFactory.GetQueryEngine(DatabaseType.Oracle), typeof(SqlQueryEngine));
+
+            MutationEngineFactory mutationEngineFactory = (MutationEngineFactory)server.Services.GetService(typeof(IMutationEngineFactory));
+            Assert.IsInstanceOfType(mutationEngineFactory.GetMutationEngine(DatabaseType.Oracle), typeof(SqlMutationEngine));
+
+            QueryManagerFactory queryManagerFactory = (QueryManagerFactory)server.Services.GetService(typeof(IAbstractQueryManagerFactory));
+            Assert.IsInstanceOfType(queryManagerFactory.GetQueryBuilder(DatabaseType.Oracle), typeof(OracleQueryBuilder));
+            Assert.IsInstanceOfType(queryManagerFactory.GetQueryExecutor(DatabaseType.Oracle), typeof(OracleQueryExecutor));
+
+            MetadataProviderFactory metadataProviderFactory = (MetadataProviderFactory)server.Services.GetService(typeof(IMetadataProviderFactory));
+            Assert.IsTrue(metadataProviderFactory.ListMetadataProviders().Any(x => x.GetType() == typeof(OracleMetadataProvider)));
         }
 
         [TestMethod("Validates that trying to override configs that are already set fail."), TestCategory(TestCategory.COSMOSDBNOSQL)]
@@ -3303,8 +3324,9 @@ type Moon {
             {
                 HttpMethod httpMethod = SqlTestHelper.ConvertRestMethodToHttpMethod(SupportedHttpVerb.Post);
                 string requestBody = @"{
-                        ""title"": ""Harry Potter and the Order of Phoenix"",
-                        ""publisher_id"": 1234";
+                    ""title"": ""Harry Potter and the Order of Phoenix"",
+                    ""publisher_id"": 1234
+                }";
 
                 if (includeExtraneousFieldInRequestBody)
                 {

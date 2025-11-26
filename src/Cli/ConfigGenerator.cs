@@ -191,6 +191,7 @@ namespace Cli
                 case DatabaseType.MySQL:
                 case DatabaseType.PostgreSQL:
                 case DatabaseType.CosmosDB_PostgreSQL:
+                case DatabaseType.Oracle:
                     break;
                 default:
                     throw new Exception($"DatabaseType: ${dbType} not supported.Please provide a valid database-type.");

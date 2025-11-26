@@ -76,6 +76,26 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         public virtual Dictionary<EntityActionOperation, string?> DbPolicyPredicatesForOperations { get; set; } = new();
 
         public const string PARAM_NAME_PREFIX = "@";
+        public const string ORACLE_PARAM_NAME_PREFIX = ":";
+
+        /// <summary>
+        /// Parameter name prefix. Returns database-specific prefix.
+        /// Default is "@" for SQL Server, MySQL, PostgreSQL.
+        /// Oracle uses ":" prefix.
+        /// </summary>
+        public string? ParamNamePrefix
+        {
+            get
+            {
+                // Check database type from MetadataProvider
+                if (MetadataProvider?.GetDatabaseType() == DatabaseType.Oracle)
+                {
+                    return ORACLE_PARAM_NAME_PREFIX;
+                }
+
+                return PARAM_NAME_PREFIX;
+            }
+        }
 
         public BaseQueryStructure(
             ISqlMetadataProvider metadataProvider,
@@ -119,19 +139,41 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         public virtual string MakeDbConnectionParam(object? value, string? paramName = null)
         {
             string encodedParamName = GetEncodedParamName(Counter.Next());
+
+            // Add prefix for use as dictionary key and in SQL queries
+            string fullParamName = $"{ParamNamePrefix}{encodedParamName}";
+
             if (!string.IsNullOrEmpty(paramName))
             {
-                Parameters.Add(encodedParamName,
-                    new(value,
-                        dbType: GetUnderlyingSourceDefinition().GetDbTypeForParam(paramName),
-                        sqlDbType: GetUnderlyingSourceDefinition().GetSqlDbTypeForParam(paramName)));
+                SourceDefinition sourceDefinition = GetUnderlyingSourceDefinition();
+
+                // For Oracle, include OracleDbType
+                if (MetadataProvider?.GetDatabaseType() == DatabaseType.Oracle)
+                {
+                    Parameters.Add(fullParamName,
+                        new DbConnectionParam(
+                            value,
+                            dbType: sourceDefinition.GetDbTypeForParam(paramName),
+                            sqlDbType: null, // Oracle doesn't use SqlDbType
+                            oracleDbType: sourceDefinition.GetOracleDbTypeForParam(paramName)));
+                }
+                else
+                {
+                    // Existing behavior for other databases (SQL Server, MySQL, PostgreSQL)
+                    Parameters.Add(fullParamName,
+                        new DbConnectionParam(
+                            value,
+                            dbType: sourceDefinition.GetDbTypeForParam(paramName),
+                            sqlDbType: sourceDefinition.GetSqlDbTypeForParam(paramName),
+                            oracleDbType: null));
+                }
             }
             else
             {
-                Parameters.Add(encodedParamName, new(value));
+                Parameters.Add(fullParamName, new DbConnectionParam(value));
             }
 
-            return encodedParamName;
+            return fullParamName;
         }
 
         /// <summary>
@@ -141,7 +183,7 @@ namespace Azure.DataApiBuilder.Core.Resolvers
         /// <returns>Encoded parameter name.</returns>
         public static string GetEncodedParamName(ulong counterValue)
         {
-            return $"{PARAM_NAME_PREFIX}param{counterValue}";
+            return $"param{counterValue}";
         }
 
         /// <summary>

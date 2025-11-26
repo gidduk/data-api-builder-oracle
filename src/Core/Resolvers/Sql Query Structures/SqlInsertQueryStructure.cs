@@ -74,10 +74,20 @@ namespace Azure.DataApiBuilder.Core.Resolvers
             InsertColumns = new();
             Values = new();
             OutputColumns = GenerateOutputColumns();
+    
             foreach (KeyValuePair<string, object?> param in mutationParams)
             {
                 MetadataProvider.TryGetBackingColumn(EntityName, param.Key, out string? backingColumn);
                 PopulateColumnsAndParams(backingColumn!, param.Value);
+            }
+
+            // Add output parameters for Oracle RETURNING clause
+            if (MetadataProvider.GetDatabaseType() == DatabaseType.Oracle)
+            {
+                OracleReturningParameterHelper.AddOracleOutputParameters(
+             OutputColumns,
+             GetUnderlyingSourceDefinition(),
+             Parameters);
             }
 
             if (FieldsReferencedInDbPolicyForCreateAction.Count > 0)

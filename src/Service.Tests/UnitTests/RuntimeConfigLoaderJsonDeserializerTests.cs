@@ -158,6 +158,10 @@ namespace Azure.DataApiBuilder.Service.Tests.UnitTests
                     Assert.AreEqual(runtimeConfig.DataSource.DatabaseType, DatabaseType.DWSQL);
                     Assert.AreEqual(runtimeConfig.DataSource.Options, null);
                     break;
+                case "oracle":
+                    Assert.AreEqual(runtimeConfig.DataSource.DatabaseType, DatabaseType.Oracle);
+                    Assert.AreEqual(runtimeConfig.DataSource.Options, null);
+                    break;
             }
 
             // Cleanup
